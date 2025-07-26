@@ -1,15 +1,13 @@
 import * as React from "react"
-import Link from 'next/link'
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
   asChild?: boolean
   variant?: 'default' | 'outline' | 'secondary'
   size?: 'default' | 'sm' | 'lg' | 'xl'
-  href?: string
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
-  ({ className, variant = 'default', size = 'default', asChild = false, href, children, ...props }, ref) => {
+  ({ className, variant = 'default', size = 'default', children, ...props }, ref) => {
     const baseClasses = "inline-flex items-center justify-center rounded-xl font-semibold transition-all duration-300 focus:outline-none focus:ring-4"
     
     const variants = {
@@ -27,24 +25,6 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     
     const classes = `${baseClasses} ${variants[variant]} ${sizes[size]} ${className || ''}`
     
-    // If asChild is true and we have a Link as children, render the Link directly
-    if (asChild && React.isValidElement(children) && children.type === Link) {
-      return React.cloneElement(children, {
-        className: classes,
-        ...props
-      })
-    }
-    
-    // If href is provided, render as Link
-    if (href) {
-      return (
-        <Link href={href} className={classes} {...props}>
-          {children}
-        </Link>
-      )
-    }
-    
-    // Otherwise render as button
     return (
       <button className={classes} ref={ref} {...props}>
         {children}
