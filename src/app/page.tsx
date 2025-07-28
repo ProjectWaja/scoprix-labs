@@ -462,6 +462,27 @@ export default function ScoprixUploadInterface() {
                     </div>
                   )}
 
+                  {/* Show message if no file selected or no analysis available */}
+                  {!selectedFileForAnalysis && (
+                    <div className="text-center py-12">
+                      <BarChart3 className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                      <h3 className="text-xl font-bold text-gray-900 mb-2">Select a Document</h3>
+                      <p className="text-gray-600">
+                        Choose an analyzed document above to view detailed results
+                      </p>
+                    </div>
+                  )}
+
+                  {selectedFileForAnalysis && !selectedFileForAnalysis.analysis && (
+                    <div className="text-center py-12">
+                      <AlertTriangle className="w-16 h-16 mx-auto text-yellow-500 mb-4" />
+                      <h3 className="text-xl font-bold text-gray-900 mb-2">Analysis Not Available</h3>
+                      <p className="text-gray-600">
+                        This document is still being processed or analysis failed
+                      </p>
+                    </div>
+                  )}
+
                   {/* File List */}
                   <div className="mb-8">
                     <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
@@ -605,7 +626,7 @@ export default function ScoprixUploadInterface() {
                   </div>
 
                   {/* Analysis Results Display */}
-                  {selectedFileForAnalysis && (
+                  {selectedFileForAnalysis && selectedFileForAnalysis.analysis && (
                     <div className="space-y-6">
                       {/* Summary Cards */}
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
