@@ -1,374 +1,79 @@
-"use client";
+'use client'
 
 import React, { useState, useRef, useCallback } from 'react';
-import { Upload, FileText, Shield, Info, AlertTriangle, Building, CloudUpload, CheckCircle, Download, BarChart3, Search, DollarSign, AlertCircle, Clock, Target, Calculator, ArrowLeft, X } from 'lucide-react';
+import { Upload, FileText, Settings, Shield, Zap, Check, X, Info, AlertTriangle, Building, CloudUpload, FolderOpen, CheckCircle, Trash2, Eye, Download, BarChart3, Target, Wrench } from 'lucide-react';
 
-interface UploadedFile {
-  id: number;
-  name: string;
-  size: string;
-  type: string;
-  status: 'uploading' | 'processing' | 'analyzed' | 'error';
-  uploadTime: string;
-  isSelected: boolean;
-  tag: string;
-  uploadProgress?: number;
-  file?: File;
-  extractedText?: string;
-  analysisResults?: {
-    equipmentCount: number;
-    specificationsCount: number;
-    confidence: number;
-    changes?: string[];
-    documentType?: string;
-  };
-}
+export default function ScoprixUploadInterface() {
+  const [uploadedFiles, setUploadedFiles] = useState([
+    {
+      id: 1,
+      name: 'HVAC-Floor-2-50%CD.pdf',
+      size: '2.1 MB',
+      type: 'PDF',
+      status: 'analyzed',
+      uploadTime: '1 hour ago',
+      isSelected: true,
+      tag: 'ORIGINAL',
+      analysis: {
+        equipmentCount: 47,
+        specificationsCount: 156,
+        confidence: 96,
+        equipment: [
+          { item: 'VRF Outdoor Unit', qty: 2, location: 'Roof', specs: '10 Ton, NEMA 4X' },
+          { item: 'VRF Indoor Units', qty: 12, location: 'Various Offices', specs: 'Ceiling Cassette' },
+          { item: 'Ductwork - Main', qty: 450, location: 'Above Ceiling', specs: '24" x 12" Galvanized' }
+        ],
+        specifications: [
+          { section: '23 05 00', title: 'Basic HVAC Requirements', items: 45 },
+          { section: '23 36 00', title: 'VRF Systems', items: 67 },
+          { section: '23 31 00', title: 'Ductwork', items: 44 }
+        ]
+      }
+    },
+    {
+      id: 2,
+      name: 'HVAC-Floor-2-100%CD.pdf',
+      size: '2.8 MB',
+      type: 'PDF',
+      status: 'analyzed',
+      uploadTime: '5 minutes ago',
+      isSelected: true,
+      tag: 'REVISED',
+      analysis: {
+        equipmentCount: 52,
+        specificationsCount: 168,
+        confidence: 94,
+        equipment: [
+          { item: 'VRF Outdoor Unit', qty: 3, location: 'Roof', specs: '10 Ton, NEMA 4X' },
+          { item: 'VRF Indoor Units', qty: 15, location: 'Various Offices', specs: 'Ceiling Cassette' },
+          { item: 'Ductwork - Main', qty: 520, location: 'Above Ceiling', specs: '24" x 12" Galvanized' }
+        ],
+        specifications: [
+          { section: '23 05 00', title: 'Basic HVAC Requirements', items: 48 },
+          { section: '23 36 00', title: 'VRF Systems', items: 72 },
+          { section: '23 31 00', title: 'Ductwork', items: 48 }
+        ],
+        changes: [
+          { type: 'added', item: 'VRF Outdoor Unit', from: 2, to: 3, impact: 'high' },
+          { type: 'modified', item: 'VRF Indoor Units', from: 12, to: 15, impact: 'medium' },
+          { type: 'modified', item: 'Ductwork - Main', from: 450, to: 520, impact: 'medium' }
+        ]
+      }
+    }
+  ]);
 
-const ScoprixApp = () => {
-  const [currentView, setCurrentView] = useState('landing');
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [showToast, setShowToast] = useState<{title: string, message: string, type: string} | null>(null);
+  const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState('upload');
+  const [selectedFileForAnalysis, setSelectedFileForAnalysis] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const showToastMessage = (title: string, message: string, type = 'info') => {
+  const showToastMessage = (title: string, message: string, type: string = 'info') => {
     setShowToast({ title, message, type });
     setTimeout(() => setShowToast(null), 4000);
   };
-
-  // File validation function
-  const validateFile = (file: File): { valid: boolean; error?: string } => {
-    const maxSize = 100 * 1024 * 1024; // 100MB
-    const allowedTypes = [
-      'application/pdf',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'text/plain'
-    ];
-
-    if (file.size > maxSize) {
-      return { valid: false, error: 'File size exceeds 100MB limit' };
-    }
-
-    if (!allowedTypes.includes(file.type) && !file.name.toLowerCase().match(/\.(pdf|dwg|dxf|xlsx|xls|docx|doc|txt)$/)) {
-      return { valid: false, error: 'File type not supported. Please upload PDF, DWG, Excel, or Word files.' };
-    }
-
-    return { valid: true };
-  };
-
-  // Real PDF text extraction using pdf2pic and tesseract.js
-  const extractPDFText = async (file: File): Promise<string> => {
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
-      
-      const filename = file.name.toLowerCase();
-      let extractedText = '';
-      
-      if (filename.includes('mech') || filename.includes('hvac')) {
-        extractedText = await simulateRealHVACExtraction(file);
-      } else {
-        extractedText = await simulateConstructionExtraction(file);
-      }
-      
-      return extractedText;
-      
-    } catch (error) {
-      console.error('PDF extraction failed:', error);
-      return `PDF extraction failed for ${file.name}. File may be corrupted or password protected.`;
-    }
-  };
-
-  // Simulate what tesseract.js would extract from your actual HVAC PDF
-  const simulateRealHVACExtraction = async (file: File): Promise<string> => {
-    return `
-MECHANICAL PLANS - BUCK GMP TENANT IMPROVEMENT
-Drawing Date: December 9, 2022
-Project: Tenant Improvement Scope
-File: ${file.name}
-
-=== PAGE 1: COVER SHEET ===
-Project Title: Buck Property Tenant Improvement
-Mechanical Contractor: [To Be Determined]
-Design Professional: [Mechanical Engineer]
-Code Compliance: 2019 California Mechanical Code
-
-=== PAGE 2: TITLE 24 COMPLIANCE ===
-Energy Efficiency Requirements:
-- HVAC Equipment: Minimum SEER 14 for cooling
-- Ductwork: R-6 insulation minimum
-- Controls: Programmable thermostats required
-- Ventilation: ASHRAE 62.1 compliance
-
-=== PAGE 3: SPECIFICATIONS ===
-Section 230500 - Common Work Results for HVAC
-- Pipe and fitting materials: Copper for refrigerant
-- Ductwork materials: Galvanized steel, SMACNA standards
-- Insulation: Closed cell foam for refrigerant lines
-- Supports and hangers: MSS SP-58 standards
-
-Section 238000 - Decentralized HVAC Equipment
-- Split system heat pumps: 410A refrigerant
-- Indoor units: Wall mounted or ceiling cassette
-- Outdoor units: Rooftop or ground mounted
-- Controls: Wireless thermostats with scheduling
-
-=== PAGE 4: EQUIPMENT SCHEDULE ===
-HEAT PUMP SYSTEMS:
-HP-1: 3 Ton, Split System, SEER 16, Office Area North
-HP-2: 2 Ton, Split System, SEER 16, Conference Room
-HP-3: 1.5 Ton, Split System, SEER 16, Break Room
-HP-4: 4 Ton, Split System, SEER 16, Open Office South
-
-VENTILATION:
-EF-1: Exhaust Fan, 150 CFM, Restroom
-EF-2: Exhaust Fan, 200 CFM, Break Room
-SF-1: Supply Fan, 300 CFM, Make-up Air
-
-DUCTWORK SCHEDULE:
-Main Supply: 14" x 8" rectangular, insulated
-Branch Ducts: 10" x 6" to 6" x 4", insulated
-Return Air: 16" x 10" rectangular, non-insulated
-Flexible Connections: 6" diameter at all terminals
-
-=== PAGE 5: FLOOR PLAN ===
-Layout Annotations:
-- Office Area North: HP-1 indoor unit, ceiling mounted
-- Conference Room: HP-2 indoor unit, wall mounted
-- Break Room: HP-3 indoor unit, EF-2 exhaust fan
-- Open Office South: HP-4 indoor unit, multiple zones
-
-Equipment Locations:
-- All outdoor units: Roof mounted with disconnect switches
-- Indoor units: Above drop ceiling, accessible for service
-- Thermostats: Wall mounted, 48" above finished floor
-- Ductwork: Concealed above ceiling, insulated in unconditioned spaces
-
-Connection Details:
-- Refrigerant lines: Insulated copper, brazed joints
-- Electrical: Dedicated circuits, NEMA 3R disconnects
-- Condensate drains: PVC to roof drainage system
-- Control wiring: 18 AWG, Class 2 installation
-
-NOTES:
-1. All work to comply with local building codes
-2. Coordinate with electrical contractor for power
-3. Obtain permits before installation
-4. Test and balance upon completion
-5. Provide operation and maintenance manuals
-    `;
-  };
-
-  // Generic construction document extraction simulation
-  const simulateConstructionExtraction = async (file: File): Promise<string> => {
-    return `
-CONSTRUCTION DOCUMENT ANALYSIS
-File: ${file.name}
-Size: ${(file.size / (1024 * 1024)).toFixed(1)} MB
-Extraction Method: OCR + Text Recognition
-
-Document contains construction specifications and technical drawings.
-Would extract detailed equipment schedules, specifications, and plan annotations
-using pdf2pic for image conversion and tesseract.js for text recognition.
-
-For complete analysis, implement:
-1. Page-by-page PDF to image conversion
-2. OCR text extraction from each page
-3. Pattern recognition for equipment schedules
-4. Drawing annotation extraction
-5. Title block and revision tracking
-    `;
-  };
-
-  // Enhanced construction document analysis
-  const analyzeConstructionDocument = (text: string, filename: string) => {
-    // Count equipment by looking for various patterns
-    const equipmentPatterns = [
-      /(\d+)\s*(EA|EACH|UNIT|PC)/gi,
-      /RTU-\d+/gi,
-      /VAV-\d+/gi,
-      /EF-\d+/gi,
-      /AHU-\d+/gi,
-      /HP-\d+/gi,
-      /(\d+)\s*(TON|CFM|GPM|HP)/gi
-    ];
-    
-    let equipmentCount = 0;
-    equipmentPatterns.forEach(pattern => {
-      const matches = text.match(pattern) || [];
-      equipmentCount += matches.length;
-    });
-
-    // Count specifications and standards
-    const specPatterns = [
-      /NEMA\s*\d*X*/gi,
-      /ASHRAE\s*\d*/gi,
-      /SMACNA/gi,
-      /ASME\s*B\d+/gi,
-      /Title\s*24/gi,
-      /BACnet/gi,
-      /DDC/gi,
-      /VAV/gi,
-      /VRF/gi,
-      /RTU/gi,
-      /SEER\s*\d+/gi
-    ];
-    
-    let specificationsCount = 0;
-    specPatterns.forEach(pattern => {
-      const matches = text.match(pattern) || [];
-      specificationsCount += matches.length;
-    });
-
-    // Detect document type and potential changes
-    const changes: string[] = [];
-    const lowerFilename = filename.toLowerCase();
-    
-    if (lowerFilename.includes('100%') || lowerFilename.includes('final')) {
-      changes.push('Final construction documents - compare against earlier versions');
-    }
-    if (lowerFilename.includes('gmp') || lowerFilename.includes('guaranteed')) {
-      changes.push('GMP document set - pricing basis established');
-    }
-    if (lowerFilename.includes('ti') || lowerFilename.includes('tenant')) {
-      changes.push('Tenant improvement scope - verify base building coordination');
-    }
-
-    // Calculate confidence based on content richness
-    const baseConfidence = 60;
-    const equipmentBonus = Math.min(30, equipmentCount * 2);
-    const specBonus = Math.min(20, specificationsCount);
-    const confidence = baseConfidence + equipmentBonus + specBonus;
-
-    return {
-      equipmentCount,
-      specificationsCount,
-      confidence: Math.min(98, confidence),
-      changes,
-      documentType: lowerFilename.includes('mech') ? 'Mechanical' : 
-                   lowerFilename.includes('hvac') ? 'HVAC' : 
-                   lowerFilename.includes('spec') ? 'Specifications' : 'Construction Documents'
-    };
-  };
-
-  // Real file processing function
-  const processFile = async (file: File, fileId: number) => {
-    try {
-      // Update status to processing
-      setUploadedFiles(prev => 
-        prev.map(f => f.id === fileId ? { ...f, status: 'processing' as const } : f)
-      );
-
-      // Simulate file upload progress
-      for (let progress = 0; progress <= 100; progress += 10) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        setUploadedFiles(prev => 
-          prev.map(f => f.id === fileId ? { ...f, uploadProgress: progress } : f)
-        );
-      }
-
-      // Process based on file type
-      let extractedText = '';
-      let analysisResults = {
-        equipmentCount: 0,
-        specificationsCount: 0,
-        confidence: 0,
-        changes: [] as string[]
-      };
-
-      if (file.type === 'application/pdf') {
-        // Use enhanced PDF processing with OCR capabilities
-        extractedText = await extractPDFText(file);
-        analysisResults = analyzeConstructionDocument(extractedText, file.name);
-      } else if (file.type === 'text/plain') {
-        // Handle text files
-        extractedText = await file.text();
-        analysisResults = analyzeConstructionDocument(extractedText, file.name);
-      } else {
-        // For other file types, simulate processing
-        extractedText = `Processed content from ${file.name}`;
-        analysisResults = {
-          equipmentCount: Math.floor(Math.random() * 50) + 10,
-          specificationsCount: Math.floor(Math.random() * 200) + 50,
-          confidence: Math.floor(Math.random() * 20) + 80,
-          changes: []
-        };
-      }
-
-      // Update file with results
-      setUploadedFiles(prev => 
-        prev.map(f => f.id === fileId ? { 
-          ...f, 
-          status: 'analyzed' as const,
-          extractedText,
-          analysisResults,
-          uploadProgress: 100
-        } : f)
-      );
-
-      showToastMessage('Analysis Complete', `${file.name} has been processed successfully`, 'success');
-
-    } catch (error) {
-      setUploadedFiles(prev => 
-        prev.map(f => f.id === fileId ? { ...f, status: 'error' as const } : f)
-      );
-      showToastMessage('Processing Error', `Failed to process ${file.name}`, 'error');
-    }
-  };
-
-  const handleFileUpload = useCallback(async (files: File[]) => {
-    if (files.length === 0) return;
-    
-    const validFiles: File[] = [];
-    const errors: string[] = [];
-
-    // Validate all files first
-    files.forEach(file => {
-      const validation = validateFile(file);
-      if (validation.valid) {
-        validFiles.push(file);
-      } else {
-        errors.push(`${file.name}: ${validation.error}`);
-      }
-    });
-
-    // Show validation errors
-    if (errors.length > 0) {
-      showToastMessage('Upload Errors', errors.join('; '), 'error');
-    }
-
-    if (validFiles.length === 0) return;
-
-    showToastMessage('Upload Started', `Processing ${validFiles.length} file(s)...`, 'info');
-    
-    // Add files to state and start processing
-    const newFiles: UploadedFile[] = validFiles.map((file, index) => ({
-      id: Date.now() + index,
-      name: file.name,
-      size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
-      type: file.type.includes('pdf') ? 'PDF' : 
-            file.name.toLowerCase().includes('dwg') ? 'DWG' : 
-            file.type.includes('sheet') ? 'Excel' : 'Document',
-      status: 'uploading' as const,
-      uploadTime: 'Just now',
-      isSelected: true,
-      tag: file.name.includes('50%') ? 'ORIGINAL' : 
-           file.name.includes('100%') ? 'REVISED' : 
-           file.name.toLowerCase().includes('gmp') ? 'GMP' : 'NEW',
-      uploadProgress: 0,
-      file
-    }));
-    
-    setUploadedFiles(prev => [...prev, ...newFiles]);
-
-    // Process each file
-    newFiles.forEach(fileData => {
-      if (fileData.file) {
-        processFile(fileData.file, fileData.id);
-      }
-    });
-  }, []);
 
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -385,7 +90,33 @@ For complete analysis, implement:
     setIsDragOver(false);
     const files = Array.from(e.dataTransfer.files);
     handleFileUpload(files);
-  }, [handleFileUpload]);
+  }, []);
+
+  const handleFileUpload = (files: File[]) => {
+    if (files.length === 0) return;
+    
+    setIsUploading(true);
+    showToastMessage('Upload Started', `Processing ${files.length} file(s)...`, 'info');
+    
+    // Simulate upload with progress
+    setTimeout(() => {
+      const newFiles = files.map((file, index) => ({
+        id: uploadedFiles.length + index + 1,
+        name: file.name,
+        size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
+        type: file.type.includes('pdf') ? 'PDF' : file.type.includes('dwg') ? 'DWG' : 'DOC',
+        status: 'processing',
+        uploadTime: 'Just now',
+        isSelected: true,
+        tag: 'NEW',
+        analysis: null
+      }));
+      
+      setUploadedFiles(prev => [...prev, ...newFiles]);
+      setIsUploading(false);
+      showToastMessage('Upload Complete', 'Files uploaded successfully and queued for analysis', 'success');
+    }, 2000);
+  };
 
   const toggleFileSelection = (fileId: number) => {
     setUploadedFiles(prev => 
@@ -400,619 +131,36 @@ For complete analysis, implement:
     showToastMessage('File Deleted', 'File removed from analysis queue', 'success');
   };
 
-  const selectedCount = uploadedFiles.filter(file => file.isSelected).length;
-  const analyzedFiles = uploadedFiles.filter(file => file.status === 'analyzed' && file.isSelected);
-
-  // Generate comparison results when we have multiple analyzed files
-  const generateComparison = () => {
-    if (analyzedFiles.length < 2) {
-      showToastMessage('Need More Files', 'Please upload at least 2 analyzed files for comparison', 'error');
-      return;
-    }
-
-    const changes: string[] = [];
-    analyzedFiles.forEach(file => {
-      if (file.analysisResults?.changes) {
-        changes.push(...file.analysisResults.changes);
-      }
-    });
-
-    if (changes.length === 0) {
-      showToastMessage('No Changes Detected', 'No significant changes found between document versions', 'info');
-    } else {
-      showToastMessage('Changes Detected', `Found ${changes.length} changes requiring review`, 'success');
+  const getFileIcon = (type: string) => {
+    switch (type) {
+      case 'PDF': return <FileText className="w-8 h-8 text-white" />;
+      case 'DWG': return <BarChart3 className="w-8 h-8 text-white" />;
+      default: return <FileText className="w-8 h-8 text-white" />;
     }
   };
 
-  const LandingPage = () => (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-indigo-50">
-      <header className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-6">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center">
-                <Building className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  Scoprix Labs
-                </h1>
-                <span className="text-xs text-gray-500 font-medium">Enterprise</span>
-              </div>
-            </div>
-            <nav className="hidden md:flex items-center gap-6">
-              <a href="#features" className="text-gray-600 hover:text-blue-600 font-medium">Features</a>
-              <a href="#pricing" className="text-gray-600 hover:text-blue-600 font-medium">Pricing</a>
-              <button 
-                onClick={() => setCurrentView('phase1')}
-                className="bg-blue-600 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-              >
-                Start Free Trial
-              </button>
-            </nav>
-          </div>
-        </div>
-      </header>
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'analyzed': return 'bg-green-100 text-green-800 border-green-200';
+      case 'processing': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'error': return 'bg-red-100 text-red-800 border-red-200';
+      default: return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
 
-      <section className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto text-center">
-          <h1 className="text-5xl md:text-6xl font-bold text-gray-900 mb-6">
-            Stop Losing Money on <span className="text-yellow-500">Manual Change Orders</span>
-          </h1>
-          <p className="text-xl text-gray-600 mb-8 max-w-3xl mx-auto">
-            Scoprix automates HVAC change order generation with AI. Upload construction documents, 
-            detect changes between plan sets, and generate justified CORs in minutes—not hours.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mb-12">
-            <button 
-              onClick={() => setCurrentView('phase1')}
-              className="bg-blue-600 text-white px-8 py-4 rounded-xl text-lg font-semibold hover:bg-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl"
-            >
-              Start Free Trial
-            </button>
-            <button 
-              onClick={() => setCurrentView('phase2')}
-              className="bg-white text-blue-600 px-8 py-4 rounded-xl text-lg font-semibold border-2 border-blue-600 hover:bg-blue-50 transition-all duration-300"
-            >
-              View Demo
-            </button>
-          </div>
+  const getFileTypeColor = (type: string) => {
+    switch (type) {
+      case 'PDF': return 'from-red-500 to-red-600';
+      case 'DWG': return 'from-blue-500 to-blue-600';
+      default: return 'from-gray-500 to-gray-600';
+    }
+  };
 
-          <div className="grid md:grid-cols-3 gap-8 max-w-2xl mx-auto">
-            <div className="text-center">
-              <div className="text-4xl font-bold text-blue-600 mb-2">96%</div>
-              <div className="text-gray-600">Accuracy Rate</div>
-            </div>
-            <div className="text-center">
-              <div className="text-4xl font-bold text-green-600 mb-2">75%</div>
-              <div className="text-gray-600">Time Saved</div>
-            </div>
-            <div className="text-center">
-              <div className="text-4xl font-bold text-purple-600 mb-2">$10K+</div>
-              <div className="text-gray-600">Avg COR Value</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="features" className="py-20 bg-gray-50 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-3xl font-bold text-center text-gray-900 mb-12">
-            Everything You Need to Automate Change Orders
-          </h2>
-          
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="bg-white p-6 rounded-xl shadow-lg">
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
-                <Upload className="w-6 h-6 text-blue-600" />
-              </div>
-              <h3 className="text-xl font-semibold mb-3">Smart Document Analysis</h3>
-              <p className="text-gray-600">Upload 50% and 100% CDs. AI automatically detects changes and modifications requiring cost adjustments.</p>
-              <button 
-                onClick={() => setCurrentView('phase1')}
-                className="mt-4 text-blue-600 font-semibold hover:text-blue-700"
-              >
-                Try Phase 1 →
-              </button>
-            </div>
-            
-            <div className="bg-white p-6 rounded-xl shadow-lg">
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
-                <CheckCircle className="w-6 h-6 text-green-600" />
-              </div>
-              <h3 className="text-xl font-semibold mb-3">Quote Validation</h3>
-              <p className="text-gray-600">Compare vendor quotes against plans. Catch specification gaps like missing NEMA 4X before they cost you.</p>
-              <button 
-                onClick={() => setCurrentView('phase2')}
-                className="mt-4 text-green-600 font-semibold hover:text-green-700"
-              >
-                Try Phase 2 →
-              </button>
-            </div>
-            
-            <div className="bg-white p-6 rounded-xl shadow-lg">
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-                <Calculator className="w-6 h-6 text-purple-600" />
-              </div>
-              <h3 className="text-xl font-semibold mb-3">ROM Estimates</h3>
-              <p className="text-gray-600">Generate rough order of magnitude pricing using SMACNA labor standards and equipment libraries.</p>
-              <button className="mt-4 text-purple-600 font-semibold hover:text-purple-700">
-                Coming Soon
-              </button>
-            </div>
-          </div>
-        </div>
-      </section>
-    </div>
-  );
-
-  const Phase1App = () => (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 p-4 lg:p-6">
-      <div className="flex items-center gap-4 mb-6">
-        <button 
-          onClick={() => setCurrentView('landing')}
-          className="flex items-center gap-2 text-gray-600 hover:text-blue-600 font-medium"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Home
-        </button>
-      </div>
-
-      <header className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl p-6 lg:p-8 mb-8 border border-white/20">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
-              <Building className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">COR Automation Assistant</h1>
-              <p className="text-gray-600">Phase 1 • Upload & analyze construction documents</p>
-            </div>
-          </div>
-          <div className="flex gap-3">
-            <button 
-              onClick={() => setCurrentView('phase2')}
-              className="bg-green-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-green-700 transition-colors"
-            >
-              Try Phase 2
-            </button>
-            <button className="bg-white text-gray-700 px-4 py-2 rounded-lg font-semibold border border-gray-200 hover:bg-gray-50">
-              Settings
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <main className="lg:col-span-2 bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-8 flex items-center gap-3">
-            <CloudUpload className="w-6 h-6 text-blue-500" />
-            Upload Construction Documents
-          </h2>
-
-          <div 
-            className={`relative rounded-2xl p-12 text-center cursor-pointer mb-8 transition-all duration-300 border-3 border-dashed ${
-              isDragOver 
-                ? 'border-blue-500 bg-blue-50 scale-105' 
-                : 'border-gray-300 bg-gray-50 hover:border-blue-400 hover:bg-blue-50'
-            }`}
-            onDragOver={handleDragOver}
-            onDragLeave={handleDragLeave}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <CloudUpload className={`w-16 h-16 mx-auto mb-4 ${isDragOver ? 'text-blue-500' : 'text-gray-400'}`} />
-            <h3 className="text-xl font-bold text-gray-700 mb-2">
-              {isDragOver ? 'Drop files here!' : 'Drag & drop files here or click to browse'}
-            </h3>
-            <p className="text-gray-500 mb-4">Upload drawings, specifications, and vendor submittals</p>
-            <div className="inline-flex items-center gap-2 bg-red-50 text-red-600 px-4 py-2 rounded-lg border border-red-200">
-              <AlertTriangle className="w-4 h-4" />
-              <span>Maximum file size: 100MB per file</span>
-            </div>
-            <input 
-              type="file" 
-              ref={fileInputRef}
-              multiple 
-              className="hidden"
-              accept=".pdf,.dwg,.dxf,.xlsx,.xls,.docx,.doc,.txt"
-              onChange={(e) => handleFileUpload(Array.from(e.target.files || []))}
-            />
-          </div>
-
-          <div className="mb-8">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">Uploaded Files</h3>
-            {uploadedFiles.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                No files uploaded yet. Drop files above to get started.
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {uploadedFiles.map((file) => (
-                  <div key={file.id} className="bg-white rounded-xl border border-gray-200 p-4 shadow-sm">
-                    <div className="flex items-center gap-4">
-                      <input 
-                        type="checkbox" 
-                        checked={file.isSelected}
-                        onChange={() => toggleFileSelection(file.id)}
-                        className="w-5 h-5 text-blue-600 rounded"
-                      />
-                      <div className="w-12 h-12 bg-red-500 rounded-xl flex items-center justify-center">
-                        <FileText className="w-6 h-6 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h4 className="font-semibold text-gray-900">{file.name}</h4>
-                          <span className={`px-2 py-1 text-xs font-bold rounded ${
-                            file.tag === 'ORIGINAL' ? 'bg-purple-100 text-purple-800' :
-                            file.tag === 'REVISED' ? 'bg-green-100 text-green-800' :
-                            file.tag === 'GMP' ? 'bg-orange-100 text-orange-800' :
-                            'bg-blue-100 text-blue-800'
-                          }`}>
-                            {file.tag}
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-600">{file.size} • Uploaded {file.uploadTime}</p>
-                        
-                        {/* Upload Progress Bar */}
-                        {file.status === 'uploading' && (
-                          <div className="mt-2">
-                            <div className="w-full bg-gray-200 rounded-full h-2">
-                              <div 
-                                className="bg-blue-600 h-2 rounded-full transition-all duration-300" 
-                                style={{ width: `${file.uploadProgress || 0}%` }}
-                              ></div>
-                            </div>
-                            <p className="text-xs text-gray-500 mt-1">Uploading... {file.uploadProgress || 0}%</p>
-                          </div>
-                        )}
-
-                        {/* Analysis Results */}
-                        {file.status === 'analyzed' && file.analysisResults && (
-                          <div className="mt-2 text-xs text-gray-600">
-                            <div className="flex items-center gap-4 flex-wrap">
-                              <span>📋 {file.analysisResults.equipmentCount} equipment items</span>
-                              <span>📝 {file.analysisResults.specificationsCount} specifications</span>
-                              <span>🎯 {file.analysisResults.confidence}% confidence</span>
-                              {file.analysisResults.documentType && (
-                                <span className="text-blue-600 font-medium">📄 {file.analysisResults.documentType}</span>
-                              )}
-                            </div>
-                            {file.analysisResults.changes && file.analysisResults.changes.length > 0 && (
-                              <div className="mt-1">
-                                <span className="text-orange-600 font-medium">⚠️ {file.analysisResults.changes.length} analysis notes:</span>
-                                <ul className="text-xs text-gray-500 mt-1 ml-4">
-                                  {file.analysisResults.changes.slice(0, 2).map((change, idx) => (
-                                    <li key={idx}>• {change}</li>
-                                  ))}
-                                </ul>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${
-                          file.status === 'analyzed' ? 'bg-green-100 text-green-800' : 
-                          file.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
-                          file.status === 'uploading' ? 'bg-blue-100 text-blue-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {file.status === 'analyzed' ? 'Analyzed' : 
-                           file.status === 'processing' ? 'Processing' :
-                           file.status === 'uploading' ? 'Uploading' : 'Error'}
-                        </span>
-                        <button
-                          onClick={() => deleteFile(file.id)}
-                          className="p-2 text-gray-400 hover:text-red-600 transition-colors"
-                        >
-                          <X className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {analyzedFiles.length > 1 && (
-            <div className="text-center">
-              <button 
-                className="bg-green-600 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-green-700 transition-colors"
-                onClick={generateComparison}
-              >
-                <BarChart3 className="w-5 h-5 mr-2 inline" />
-                Compare Versions & Generate CORs
-              </button>
-            </div>
-          )}
-        </main>
-
-        <aside className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-6">
-          <h3 className="text-xl font-bold text-gray-900 mb-6">Analysis Dashboard</h3>
-          
-          <div className="space-y-4">
-            <div className="bg-green-50 rounded-xl p-4 border border-green-200">
-              <div className="text-green-800 font-bold mb-1">Ready for Analysis</div>
-              <div className="text-2xl font-bold text-green-900">{selectedCount} Files</div>
-            </div>
-            
-            <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
-              <div className="text-blue-800 font-bold mb-1">Analyzed Files</div>
-              <div className="text-2xl font-bold text-blue-900">{analyzedFiles.length}</div>
-            </div>
-            
-            <div className="bg-purple-50 rounded-xl p-4 border border-purple-200">
-              <div className="text-purple-800 font-bold mb-1">Accuracy Rate</div>
-              <div className="text-2xl font-bold text-purple-900">
-                {analyzedFiles.length > 0 
-                  ? Math.round(analyzedFiles.reduce((sum, f) => sum + (f.analysisResults?.confidence || 0), 0) / analyzedFiles.length)
-                  : 96}%
-              </div>
-            </div>
-          </div>
-
-          {analyzedFiles.length > 0 && (
-            <div className="mt-6 pt-6 border-t border-gray-200">
-              <h4 className="font-bold text-gray-900 mb-4">Recent Analysis</h4>
-              <div className="space-y-3">
-                {analyzedFiles.slice(0, 3).map(file => (
-                  <div key={file.id} className="bg-green-50 border border-green-200 rounded-lg p-3">
-                    <div className="font-semibold text-green-900 text-sm">{file.name}</div>
-                    <div className="text-green-700 text-xs mt-1">
-                      {file.analysisResults?.equipmentCount} equipment items • {file.analysisResults?.confidence}% confidence
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <h4 className="font-bold text-gray-900 mb-4">Quick Actions</h4>
-            <div className="space-y-2">
-              <button 
-                className="w-full bg-green-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-green-600 disabled:opacity-50"
-                disabled={analyzedFiles.length < 2}
-                onClick={generateComparison}
-              >
-                Generate COR
-              </button>
-              <button className="w-full bg-blue-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-600">
-                Create RFI
-              </button>
-            </div>
-          </div>
-        </aside>
-      </div>
-    </div>
-  );
-
-  const Phase2App = () => (
-    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 p-4 lg:p-6">
-      <div className="flex items-center gap-4 mb-6">
-        <button 
-          onClick={() => setCurrentView('landing')}
-          className="flex items-center gap-2 text-gray-600 hover:text-blue-600 font-medium"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          Back to Home
-        </button>
-      </div>
-
-      <header className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl p-6 lg:p-8 mb-8 border border-white/20">
-        <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-gradient-to-br from-green-600 to-blue-600 rounded-xl flex items-center justify-center shadow-lg">
-              <Shield className="w-6 h-6 text-white" />
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Vendor Quote Validator</h1>
-              <p className="text-gray-600">Phase 2 • Advanced CYA Protection</p>
-            </div>
-          </div>
-          <div className="flex gap-3">
-            <button 
-              onClick={() => setCurrentView('phase1')}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-            >
-              Try Phase 1
-            </button>
-            <button className="bg-white text-gray-700 px-4 py-2 rounded-lg font-semibold border border-gray-200 hover:bg-gray-50">
-              Settings
-            </button>
-          </div>
-        </div>
-      </header>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <main className="lg:col-span-2 bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-8">
-          <h2 className="text-2xl font-bold text-gray-900 mb-8 flex items-center gap-3">
-            <Search className="w-6 h-6 text-green-500" />
-            Quote Validation Results
-          </h2>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
-            <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-              <div className="flex items-center gap-3">
-                <AlertTriangle className="w-8 h-8 text-red-500" />
-                <div>
-                  <div className="text-2xl font-bold text-red-900">2</div>
-                  <div className="text-red-700 text-sm">Specification Mismatches</div>
-                </div>
-              </div>
-            </div>
-            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
-              <div className="flex items-center gap-3">
-                <AlertCircle className="w-8 h-8 text-yellow-500" />
-                <div>
-                  <div className="text-2xl font-bold text-yellow-900">1</div>
-                  <div className="text-yellow-700 text-sm">Missing Items</div>
-                </div>
-              </div>
-            </div>
-            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-              <div className="flex items-center gap-3">
-                <DollarSign className="w-8 h-8 text-blue-500" />
-                <div>
-                  <div className="text-2xl font-bold text-blue-900">$4,550</div>
-                  <div className="text-blue-700 text-sm">Potential Cost Impact</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-lg">
-            <div className="px-6 py-4 bg-gray-50 border-b">
-              <h3 className="text-lg font-bold text-gray-900">Specification Comparison</h3>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Item</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Plan Spec</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quote Spec</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Impact</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
-                  <tr className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-red-500"></div>
-                        <div className="text-sm font-medium text-gray-900">Heat Pump HP-1</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">3 Ton, SEER 16, Office Area North</td>
-                    <td className="px-6 py-4 text-sm text-gray-900">3 Ton, SEER 14, Standard Unit</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">
-                        <X className="w-3 h-3 mr-1" />
-                        Mismatch
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <AlertTriangle className="w-4 h-4 text-red-500" />
-                        <span className="text-sm font-medium text-gray-900">+$1,200</span>
-                      </div>
-                    </td>
-                  </tr>
-                  <tr className="hover:bg-gray-50">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-yellow-500"></div>
-                        <div className="text-sm font-medium text-gray-900">Programmable Thermostats</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">Wireless with scheduling capability</td>
-                    <td className="px-6 py-4 text-sm text-gray-900">Not Specified</td>
-                    <td className="px-6 py-4">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
-                        <AlertTriangle className="w-3 h-3 mr-1" />
-                        Missing
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-2">
-                        <AlertCircle className="w-4 h-4 text-yellow-500" />
-                        <span className="text-sm font-medium text-gray-900">+$800</span>
-                      </div>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-4 justify-center mt-8">
-            <button 
-              className="bg-red-600 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-red-700 transition-colors"
-              onClick={() => showToastMessage('COR Generated', 'Creating change order for identified mismatches...', 'info')}
-            >
-              <FileText className="w-5 h-5 mr-3 inline" />
-              Generate Mismatch COR
-            </button>
-            <button 
-              className="bg-yellow-600 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-yellow-700 transition-colors"
-              onClick={() => showToastMessage('RFI Created', 'Requesting clarification on specification gaps...', 'info')}
-            >
-              <AlertTriangle className="w-5 h-5 mr-3 inline" />
-              Create Clarification RFI
-            </button>
-            <button 
-              className="bg-blue-600 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg hover:bg-blue-700 transition-colors"
-              onClick={() => showToastMessage('Report Generated', 'Exporting validation summary with CYA documentation...', 'info')}
-            >
-              <Download className="w-5 h-5 mr-3 inline" />
-              Export CYA Report
-            </button>
-          </div>
-        </main>
-
-        <aside className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-6">
-          <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-            <Target className="w-5 h-5 text-green-500" />
-            Validation Dashboard
-          </h3>
-          
-          <div className="space-y-6">
-            <div className="bg-green-50 rounded-xl p-4 border border-green-200">
-              <div className="text-green-800 font-bold mb-2">Files Analyzed</div>
-              <div className="text-2xl font-bold text-green-900">2</div>
-              <div className="text-sm text-green-700 mt-1">Ready for comparison</div>
-            </div>
-            
-            <div className="bg-red-50 rounded-xl p-4 border border-red-200">
-              <div className="text-red-800 font-bold mb-2">Issues Found</div>
-              <div className="text-2xl font-bold text-red-900">2</div>
-              <div className="text-sm text-red-700 mt-1">Requiring attention</div>
-            </div>
-            
-            <div className="bg-blue-50 rounded-xl p-4 border border-blue-200">
-              <div className="text-blue-800 font-bold mb-2">Validation Accuracy</div>
-              <div className="text-2xl font-bold text-blue-900">94.2%</div>
-              <div className="text-sm text-blue-700 mt-1">AI confidence level</div>
-            </div>
-          </div>
-
-          <div className="mt-6 pt-6 border-t border-gray-200">
-            <h4 className="font-bold text-gray-900 mb-4">Quick Actions</h4>
-            <div className="space-y-3">
-              <button 
-                className="w-full bg-red-500 text-white py-3 px-4 rounded-lg font-semibold hover:bg-red-600 transition-colors"
-                onClick={() => showToastMessage('COR Generator', 'Creating change order for all mismatches...', 'info')}
-              >
-                <FileText className="w-4 h-4 mr-2 inline" />
-                Generate COR
-              </button>
-              <button 
-                className="w-full bg-yellow-500 text-white py-3 px-4 rounded-lg font-semibold hover:bg-yellow-600 transition-colors"
-                onClick={() => showToastMessage('RFI Creator', 'Creating RFI for specification clarifications...', 'info')}
-              >
-                <AlertTriangle className="w-4 h-4 mr-2 inline" />
-                Create RFI
-              </button>
-              <button 
-                className="w-full bg-blue-500 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-600 transition-colors"
-                onClick={() => showToastMessage('CYA Report', 'Generating comprehensive audit documentation...', 'info')}
-              >
-                <Shield className="w-4 h-4 mr-2 inline" />
-                CYA Report
-              </button>
-            </div>
-          </div>
-        </aside>
-      </div>
-    </div>
-  );
+  const selectedCount = uploadedFiles.filter(file => file.isSelected).length;
 
   return (
-    <div>
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 via-blue-50 to-indigo-50 p-4 lg:p-6">
+      {/* Toast Notification */}
       {showToast && (
         <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-top duration-300">
           <div className={`p-4 rounded-xl shadow-lg border-l-4 max-w-sm ${
@@ -1041,11 +189,725 @@ For complete analysis, implement:
         </div>
       )}
 
-      {currentView === 'landing' && <LandingPage />}
-      {currentView === 'phase1' && <Phase1App />}
-      {currentView === 'phase2' && <Phase2App />}
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
+        <header className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl p-6 lg:p-8 mb-8 border border-white/20 relative overflow-hidden">
+          <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 to-purple-600/5"></div>
+          <div className="relative flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            <div className="flex flex-col lg:flex-row lg:items-center gap-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                  <Building className="w-6 h-6 text-white" />
+                </div>
+                <h1 className="text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent tracking-tight">
+                  Scoprix Labs
+                </h1>
+                <span className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white text-xs font-bold uppercase tracking-wider rounded-full shadow-lg animate-pulse">
+                  Enterprise
+                </span>
+              </div>
+              <div className="lg:ml-4">
+                <div className="text-xl font-bold text-gray-800 tracking-tight">
+                  Metro Hospital HVAC Retrofit
+                </div>
+                <div className="text-sm text-gray-600 font-medium flex items-center gap-2">
+                  <Shield className="w-4 h-4 text-green-500" />
+                  Project #4521 • SOC 2 Compliant
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-4">
+              <button 
+                className="bg-gradient-to-r from-blue-600 to-purple-600 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-blue-300"
+                onClick={() => showToastMessage('Audit Log', 'Opening comprehensive audit and compliance history...', 'info')}
+              >
+                <FileText className="w-4 h-4 mr-2" />
+                Audit Log
+              </button>
+              <button 
+                className="bg-white/80 text-gray-700 px-6 py-3 rounded-xl font-semibold border border-gray-200 hover:bg-white hover:shadow-lg transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-gray-300"
+                onClick={() => showToastMessage('Settings', 'Opening system configuration panel...', 'info')}
+              >
+                <Settings className="w-4 h-4 mr-2" />
+                Settings
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* Tab Navigation */}
+        <div className="flex gap-2 mb-8">
+          {[
+            { id: 'upload', label: 'Upload & Process', icon: CloudUpload },
+            { id: 'analysis', label: 'Analysis Results', icon: BarChart3 },
+            { id: 'compare', label: 'Compare & COR', icon: FileText }
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center gap-2 px-6 py-3 rounded-xl font-semibold transition-all duration-300 ${
+                activeTab === tab.id
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'bg-white/80 text-gray-700 hover:bg-blue-50 border border-gray-200'
+              }`}
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Upload Section */}
+          <main className="lg:col-span-2 bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 overflow-hidden relative">
+            <div className="absolute inset-0 bg-gradient-to-br from-green-500/5 to-blue-500/5"></div>
+            
+            <div className="relative p-8">
+              {activeTab === 'upload' && (
+                <>
+                  <div className="flex items-center gap-4 mb-8">
+                    <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-blue-500 rounded-lg flex items-center justify-center">
+                      <CloudUpload className="w-5 h-5 text-white" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
+                      Upload Construction Documents
+                    </h2>
+                    <div className="relative">
+                      <button 
+                        className="w-8 h-8 bg-gradient-to-br from-blue-100 to-purple-100 text-blue-600 rounded-full flex items-center justify-center font-bold hover:from-blue-500 hover:to-purple-500 hover:text-white transition-all duration-300 shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300"
+                        onMouseEnter={() => setActiveTooltip('upload-tip')}
+                        onMouseLeave={() => setActiveTooltip(null)}
+                      >
+                        <Info className="w-4 h-4" />
+                      </button>
+                      {activeTooltip === 'upload-tip' && (
+                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-3 w-80 bg-gray-900/95 backdrop-blur-sm text-white p-6 rounded-2xl shadow-2xl z-50 animate-in fade-in duration-200">
+                          <div className="flex items-start justify-between mb-4">
+                            <div className="flex items-center gap-3 text-yellow-400 font-bold">
+                              <Zap className="w-4 h-4" />
+                              <span>Upload Strategy Pro Tips</span>
+                            </div>
+                          </div>
+                          <div className="text-sm leading-relaxed space-y-2">
+                            <div className="flex items-start gap-2">
+                              <Check className="w-4 h-4 text-green-400 mt-1 flex-shrink-0" />
+                              <span>Upload both 50% and 100% construction documents for optimal change detection</span>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <Check className="w-4 h-4 text-green-400 mt-1 flex-shrink-0" />
+                              <span>Include equipment schedules and vendor submittals for comprehensive analysis</span>
+                            </div>
+                            <div className="flex items-start gap-2">
+                              <Zap className="w-4 h-4 text-yellow-400 mt-1 flex-shrink-0" />
+                              <span><strong>95%+ accuracy</strong> in change detection with complete document sets!</span>
+                            </div>
+                          </div>
+                          <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-8 border-transparent border-t-gray-900"></div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Integration Banner */}
+                  <div className="bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 border-2 border-blue-200 rounded-2xl p-6 mb-8 relative overflow-hidden">
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500"></div>
+                    <div className="flex flex-col lg:flex-row items-start lg:items-center gap-6">
+                      <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center shadow-lg">
+                        <Zap className="w-8 h-8 text-white" />
+                      </div>
+                      <div className="flex-1">
+                        <div className="text-xl font-bold text-gray-900 mb-2">
+                          Connected Integrations
+                        </div>
+                        <div className="text-gray-600">
+                          Real-time sync with construction management platforms
+                        </div>
+                      </div>
+                      <div className="flex gap-3">
+                        <button 
+                          className="bg-blue-500 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:bg-blue-600 hover:shadow-xl transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-blue-300"
+                          onClick={() => showToastMessage('Procore Sync', 'Syncing project data with Procore platform...', 'info')}
+                        >
+                          <Building className="w-4 h-4 mr-2" />
+                          Procore
+                        </button>
+                        <button 
+                          className="bg-indigo-500 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:bg-indigo-600 hover:shadow-xl transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-indigo-300"
+                          onClick={() => showToastMessage('Bluebeam Sync', 'Exporting markups to Bluebeam platform...', 'info')}
+                        >
+                          <BarChart3 className="w-4 h-4 mr-2" />
+                          Bluebeam
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Enhanced Upload Area */}
+                  <div 
+                    className={`relative rounded-2xl p-12 text-center cursor-pointer mb-8 transition-all duration-300 border-3 border-dashed ${
+                      isDragOver 
+                        ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 scale-105 shadow-2xl' 
+                        : 'border-gray-300 bg-gradient-to-br from-gray-50 to-blue-50 hover:border-blue-400 hover:bg-gradient-to-br hover:from-blue-50 hover:to-indigo-50 hover:shadow-lg hover:-translate-y-1'
+                    } focus:outline-none focus:ring-4 focus:ring-blue-300`}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                    onClick={() => fileInputRef.current?.click()}
+                    onKeyDown={(e) => e.key === 'Enter' && fileInputRef.current?.click()}
+                    tabIndex={0}
+                    role="button"
+                    aria-label="Upload construction documents by clicking here or dragging files"
+                  >
+                    {/* Background animation overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 via-blue-500/5 to-blue-500/0 rounded-2xl opacity-0 hover:opacity-100 transition-opacity duration-500"></div>
+                    
+                    <div className="relative z-10">
+                      <div className="mb-6">
+                        <CloudUpload className={`w-16 h-16 mx-auto transition-all duration-300 ${
+                          isDragOver ? 'text-blue-500 animate-bounce' : 'text-gray-400 hover:text-blue-500'
+                        }`} />
+                      </div>
+                      
+                      <h3 className="text-2xl font-bold text-gray-700 mb-3">
+                        <span className="hidden sm:inline">
+                          {isDragOver ? 'Drop files here!' : 'Drag & drop files here or click to browse'}
+                        </span>
+                        <span className="sm:hidden">Tap to upload files</span>
+                      </h3>
+                      
+                      <p className="text-gray-500 mb-6 text-lg">
+                        Upload drawings, specifications, and vendor submittals
+                      </p>
+                      
+                      <div className="inline-flex items-center gap-3 bg-red-50 text-red-600 px-6 py-3 rounded-xl font-semibold border-2 border-red-200 shadow-md">
+                        <AlertTriangle className="w-4 h-4" />
+                        <span>Maximum file size: 100MB per file</span>
+                      </div>
+
+                      <input 
+                        type="file" 
+                        ref={fileInputRef}
+                        multiple 
+                        className="hidden"
+                        accept=".pdf,.dwg,.dxf,.xlsx,.xls,.docx,.doc,.jpg,.jpeg,.png"
+                        onChange={(e) => handleFileUpload(Array.from(e.target.files || []))}
+                      />
+                    </div>
+                  </div>
+
+                  {/* File Type Indicators */}
+                  <div className="flex flex-wrap gap-3 justify-center mb-8">
+                    {[
+                      { label: 'PDF Drawings', icon: FileText, color: 'from-red-100 to-red-50 text-red-700 border-red-200' },
+                      { label: 'DWG/DXF', icon: BarChart3, color: 'from-blue-100 to-blue-50 text-blue-700 border-blue-200' },
+                      { label: 'Excel Specs', icon: FileText, color: 'from-green-100 to-green-50 text-green-700 border-green-200' },
+                      { label: 'Word Docs', icon: FileText, color: 'from-purple-100 to-purple-50 text-purple-700 border-purple-200' },
+                      { label: 'Images', icon: Eye, color: 'from-yellow-100 to-yellow-50 text-yellow-700 border-yellow-200' }
+                    ].map((type, index) => (
+                      <span key={index} className={`px-4 py-2 bg-gradient-to-r ${type.color} rounded-xl font-semibold border shadow-sm`}>
+                        <type.icon className="w-4 h-4 mr-2 inline" />
+                        {type.label}
+                      </span>
+                    ))}
+                  </div>
+
+                  {/* Selected Files Info */}
+                  {selectedCount > 0 && (
+                    <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-2xl p-6 mb-8 shadow-lg animate-in fade-in duration-300">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-indigo-500 rounded-xl flex items-center justify-center">
+                          <Check className="w-6 h-6 text-white" />
+                        </div>
+                        <div>
+                          <p className="text-blue-900 font-bold text-lg">
+                            {selectedCount} file{selectedCount !== 1 ? 's' : ''} selected
+                          </p>
+                          <p className="text-blue-700">Ready for version comparison and analysis</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* File List */}
+                  <div className="mb-8">
+                    <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                      <FolderOpen className="w-5 h-5 text-blue-500" />
+                      Uploaded Files
+                    </h3>
+                    <div className="space-y-4">
+                      {uploadedFiles.map((file) => (
+                        <div key={file.id} className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border-2 border-blue-300 p-6 shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:scale-[1.02]">
+                          <div className="flex items-center gap-6">
+                            <input 
+                              type="checkbox" 
+                              checked={file.isSelected}
+                              onChange={() => toggleFileSelection(file.id)}
+                              className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 focus:ring-4"
+                            />
+                            <div className={`w-16 h-16 bg-gradient-to-br ${getFileTypeColor(file.type)} rounded-2xl flex items-center justify-center shadow-lg`}>
+                              {getFileIcon(file.type)}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-3 mb-2">
+                                <h4 className="font-bold text-gray-900 text-lg">{file.name}</h4>
+                                <span className={`px-3 py-1 text-white text-sm font-bold rounded-lg shadow-md ${
+                                  file.tag === 'ORIGINAL' ? 'bg-gradient-to-r from-purple-500 to-purple-600' :
+                                  file.tag === 'REVISED' ? 'bg-gradient-to-r from-green-500 to-green-600' :
+                                  'bg-gradient-to-r from-blue-500 to-blue-600'
+                                }`}>
+                                  {file.tag}
+                                </span>
+                                {file.analysis && (
+                                  <div className="relative">
+                                    <button 
+                                      className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-500 hover:text-white transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                      onMouseEnter={() => setActiveTooltip(`analysis-${file.id}`)}
+                                      onMouseLeave={() => setActiveTooltip(null)}
+                                    >
+                                      <Info className="w-3 h-3" />
+                                    </button>
+                                    {activeTooltip === `analysis-${file.id}` && (
+                                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-72 bg-gray-900/95 backdrop-blur-sm text-white p-4 rounded-xl shadow-2xl z-50 animate-in fade-in duration-200">
+                                        <div className="text-yellow-400 font-bold mb-2 flex items-center gap-2">
+                                          <BarChart3 className="w-4 h-4" />
+                                          File Analysis
+                                        </div>
+                                        <div className="text-sm">
+                                          This document contains {file.analysis.equipmentCount} equipment items and {file.analysis.specificationsCount} specifications. 
+                                          Analysis confidence: {file.analysis.confidence}%. Perfect for comparison analysis!
+                                        </div>
+                                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-6 border-transparent border-t-gray-900"></div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                              <p className="text-gray-600">{file.size} • Uploaded {file.uploadTime} • {file.status === 'analyzed' ? 'Analysis complete' : 'Processing...'}</p>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <span className={`px-4 py-2 rounded-xl font-bold border shadow-sm ${getStatusColor(file.status)}`}>
+                                {file.status === 'analyzed' && <CheckCircle className="w-4 h-4 mr-2 inline" />}
+                                {file.status === 'processing' && <div className="w-4 h-4 mr-2 inline-block border-2 border-yellow-600 border-t-transparent rounded-full animate-spin"></div>}
+                                {file.status === 'analyzed' ? 'Analyzed' : 'Processing'}
+                              </span>
+                              <button 
+                                className="w-12 h-12 bg-gray-100 text-gray-500 rounded-xl hover:bg-blue-500 hover:text-white transition-all duration-300 shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300"
+                                onClick={() => showToastMessage('File Preview', `Opening preview for ${file.name}...`, 'info')}
+                              >
+                                <Eye className="w-5 h-5 mx-auto" />
+                              </button>
+                              <button 
+                                className="w-12 h-12 bg-red-100 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all duration-300 shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-red-300"
+                                onClick={() => deleteFile(file.id)}
+                              >
+                                <Trash2 className="w-5 h-5 mx-auto" />
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Action Buttons */}
+                  {selectedCount > 0 && (
+                    <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                      <button 
+                        className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-blue-300 hover:-translate-y-1"
+                        onClick={() => setActiveTab('analysis')}
+                      >
+                        <Eye className="w-5 h-5 mr-3 inline" />
+                        View Analysis Results
+                      </button>
+                      <button 
+                        className="bg-gradient-to-r from-green-600 to-green-700 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-green-300 hover:-translate-y-1"
+                        onClick={() => setActiveTab('compare')}
+                      >
+                        <BarChart3 className="w-5 h-5 mr-3 inline" />
+                        Compare Versions & Generate CORs
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {activeTab === 'analysis' && (
+                <>
+                  <div className="flex items-center gap-4 mb-8">
+                    <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-blue-500 rounded-lg flex items-center justify-center">
+                      <BarChart3 className="w-5 h-5 text-white" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
+                      Document Analysis Results
+                    </h2>
+                  </div>
+
+                  {/* File Selection for Analysis */}
+                  <div className="mb-8">
+                    <h3 className="text-lg font-bold text-gray-900 mb-4">Select Document to Analyze</h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {uploadedFiles.filter(f => f.status === 'analyzed').map((file) => (
+                        <button
+                          key={file.id}
+                          onClick={() => setSelectedFileForAnalysis(file)}
+                          className={`p-4 rounded-xl border-2 transition-all duration-300 text-left ${
+                            selectedFileForAnalysis?.id === file.id
+                              ? 'border-blue-500 bg-blue-50'
+                              : 'border-gray-200 bg-white hover:border-blue-300'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className={`w-12 h-12 bg-gradient-to-br ${getFileTypeColor(file.type)} rounded-xl flex items-center justify-center shadow-lg`}>
+                              {getFileIcon(file.type)}
+                            </div>
+                            <div>
+                              <div className="font-bold text-gray-900">{file.name}</div>
+                              <div className="text-sm text-gray-600">{file.analysis?.equipmentCount} equipment items • {file.analysis?.confidence}% confidence</div>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Analysis Results Display */}
+                  {selectedFileForAnalysis && (
+                    <div className="space-y-6">
+                      {/* Summary Cards */}
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                          <div className="flex items-center gap-3">
+                            <BarChart3 className="w-8 h-8 text-blue-500" />
+                            <div>
+                              <div className="text-2xl font-bold text-blue-900">{selectedFileForAnalysis.analysis.equipmentCount}</div>
+                              <div className="text-blue-700 text-sm">Equipment Items</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+                          <div className="flex items-center gap-3">
+                            <FileText className="w-8 h-8 text-green-500" />
+                            <div>
+                              <div className="text-2xl font-bold text-green-900">{selectedFileForAnalysis.analysis.specificationsCount}</div>
+                              <div className="text-green-700 text-sm">Specifications</div>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="bg-purple-50 border border-purple-200 rounded-xl p-4">
+                          <div className="flex items-center gap-3">
+                            <Target className="w-8 h-8 text-purple-500" />
+                            <div>
+                              <div className="text-2xl font-bold text-purple-900">{selectedFileForAnalysis.analysis.confidence}%</div>
+                              <div className="text-purple-700 text-sm">AI Confidence</div>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Equipment Analysis */}
+                      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-lg">
+                        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                            <Wrench className="w-5 h-5 text-blue-500" />
+                            Equipment Schedule
+                          </h3>
+                        </div>
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead className="bg-gray-50">
+                              <tr>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Equipment</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Quantity</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Location</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Specifications</th>
+                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody className="bg-white divide-y divide-gray-200">
+                              {selectedFileForAnalysis.analysis.equipment.map((item: any, index: number) => (
+                                <tr key={index} className="hover:bg-gray-50">
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <div className="text-sm font-medium text-gray-900">{item.item}</div>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                      {item.qty}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.location}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.specs}</td>
+                                  <td className="px-6 py-4 whitespace-nowrap">
+                                    <button className="text-blue-600 hover:text-blue-900 text-sm font-medium">
+                                      Edit
+                                    </button>
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+
+                      {/* Specifications Analysis */}
+                      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-lg">
+                        <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                          <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                            <FileText className="w-5 h-5 text-green-500" />
+                            Technical Specifications
+                          </h3>
+                        </div>
+                        <div className="p-6">
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {selectedFileForAnalysis.analysis.specifications.map((spec: any, index: number) => (
+                              <div key={index} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                                <div className="font-bold text-gray-900">{spec.section}</div>
+                                <div className="text-sm text-gray-600 mt-1">{spec.title}</div>
+                                <div className="text-lg font-bold text-blue-600 mt-2">{spec.items} items</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Changes Detection (if available) */}
+                      {selectedFileForAnalysis.analysis.changes && (
+                        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden shadow-lg">
+                          <div className="px-6 py-4 bg-gray-50 border-b border-gray-200">
+                            <h3 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                              <AlertTriangle className="w-5 h-5 text-orange-500" />
+                              Detected Changes from Previous Version
+                            </h3>
+                          </div>
+                          <div className="p-6">
+                            <div className="space-y-4">
+                              {selectedFileForAnalysis.analysis.changes.map((change: any, index: number) => (
+                                <div key={index} className={`p-4 rounded-lg border-l-4 ${
+                                  change.type === 'added' ? 'bg-green-50 border-green-500' :
+                                  change.type === 'modified' ? 'bg-yellow-50 border-yellow-500' :
+                                  'bg-red-50 border-red-500'
+                                }`}>
+                                  <div className="flex items-center justify-between">
+                                    <div>
+                                      <div className="font-bold text-gray-900">{change.item}</div>
+                                      <div className="text-sm text-gray-600">
+                                        {change.type === 'added' ? `Added ${change.to} units` :
+                                         change.type === 'modified' ? `Changed from ${change.from} to ${change.to} units` :
+                                         `Removed ${change.from} units`}
+                                      </div>
+                                    </div>
+                                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${
+                                      change.impact === 'high' ? 'bg-red-100 text-red-800' :
+                                      change.impact === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                                      'bg-blue-100 text-blue-800'
+                                    }`}>
+                                      {change.impact} impact
+                                    </span>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Action Buttons */}
+                      <div className="flex gap-4 justify-center">
+                        <button 
+                          className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-blue-300"
+                          onClick={() => showToastMessage('Analysis Export', 'Generating detailed analysis report...', 'info')}
+                        >
+                          <Download className="w-4 h-4 mr-2 inline" />
+                          Export Analysis
+                        </button>
+                        <button 
+                          className="bg-gradient-to-r from-green-600 to-green-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-green-300"
+                          onClick={() => setActiveTab('compare')}
+                        >
+                          <BarChart3 className="w-4 h-4 mr-2 inline" />
+                          Compare with Other Files
+                        </button>
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
+
+              {activeTab === 'compare' && (
+                <>
+                  <div className="flex items-center gap-4 mb-8">
+                    <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-blue-500 rounded-lg flex items-center justify-center">
+                      <FileText className="w-5 h-5 text-white" />
+                    </div>
+                    <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
+                      Compare Documents & Generate CORs
+                    </h2>
+                  </div>
+
+                  {selectedCount > 1 ? (
+                    <div className="text-center py-12">
+                      <div className="mb-6">
+                        <BarChart3 className="w-16 h-16 mx-auto text-blue-500 mb-4" />
+                        <h3 className="text-xl font-bold text-gray-900 mb-2">Ready to Compare</h3>
+                        <p className="text-gray-600">
+                          {selectedCount} files selected for version comparison and COR generation
+                        </p>
+                      </div>
+                      <button 
+                        className="bg-gradient-to-r from-green-600 to-green-700 text-white px-8 py-4 rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-green-300 hover:-translate-y-1"
+                        onClick={() => showToastMessage('Analysis Started', 'Comparing document versions and generating change orders...', 'info')}
+                      >
+                        <BarChart3 className="w-5 h-5 mr-3 inline" />
+                        Start Comparison Analysis
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="text-center py-12">
+                      <AlertTriangle className="w-16 h-16 mx-auto text-yellow-500 mb-4" />
+                      <h3 className="text-xl font-bold text-gray-900 mb-2">Need More Files</h3>
+                      <p className="text-gray-600 mb-6">
+                        Please select at least 2 analyzed files to compare versions and generate change orders.
+                      </p>
+                      <button 
+                        className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-blue-300"
+                        onClick={() => setActiveTab('upload')}
+                      >
+                        <CloudUpload className="w-4 h-4 mr-2 inline" />
+                        Upload More Files
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+          </main>
+
+          {/* Analysis Sidebar */}
+          <aside className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-xl border border-white/20 p-6 h-fit">
+            <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+              <BarChart3 className="w-5 h-5 text-green-500" />
+              Analysis Dashboard
+            </h3>
+            
+            <div className="space-y-6">
+              <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200">
+                <div className="text-green-800 font-bold mb-2">Ready for Analysis</div>
+                <div className="text-2xl font-bold text-green-900">{selectedCount} Files</div>
+                <div className="text-sm text-green-700 mt-1">Optimal comparison set detected</div>
+              </div>
+              
+              <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
+                <div className="text-blue-800 font-bold mb-2">Processing Speed</div>
+                <div className="text-2xl font-bold text-blue-900">2.4 min</div>
+                <div className="text-sm text-blue-700 mt-1">Average analysis time</div>
+              </div>
+              
+              <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-200">
+                <div className="text-purple-800 font-bold mb-2">Accuracy Rate</div>
+                <div className="text-2xl font-bold text-purple-900">96.7%</div>
+                <div className="text-sm text-purple-700 mt-1">Change detection precision</div>
+              </div>
+
+              {/* Recent Analysis Results */}
+              <div className="border-t border-gray-200 pt-6">
+                <h4 className="font-bold text-gray-900 mb-4 flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-green-500" />
+                  Recent Results
+                </h4>
+                <div className="space-y-3">
+                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                    <div className="font-semibold text-yellow-900 text-sm">⚠️ 7 Changes Detected</div>
+                    <div className="text-yellow-700 text-xs mt-1">HVAC equipment specifications modified</div>
+                  </div>
+                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                    <div className="font-semibold text-green-900 text-sm">✅ COR-2024-003 Generated</div>
+                    <div className="text-green-700 text-xs mt-1">$47,250 additional scope identified</div>
+                  </div>
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                    <div className="font-semibold text-blue-900 text-sm">📋 RFI-2024-012 Triggered</div>
+                    <div className="text-blue-700 text-xs mt-1">NEMA 4X clarification required</div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Actions */}
+              <div className="border-t border-gray-200 pt-6">
+                <h4 className="font-bold text-gray-900 mb-4">Quick Actions</h4>
+                <div className="space-y-3">
+                  <button 
+                    className="w-full bg-gradient-to-r from-green-500 to-green-600 text-white py-3 px-4 rounded-lg font-semibold hover:from-green-600 hover:to-green-700 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-green-300 shadow-md hover:shadow-lg"
+                    onClick={() => showToastMessage('COR Generator', 'Opening change order generator with detected modifications...', 'info')}
+                  >
+                    <FileText className="w-4 h-4 mr-2 inline" />
+                    Generate COR
+                  </button>
+                  <button 
+                    className="w-full bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:from-blue-600 hover:to-blue-700 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-blue-300 shadow-md hover:shadow-lg"
+                    onClick={() => showToastMessage('RFI Creator', 'Creating RFI for specification clarifications...', 'info')}
+                  >
+                    <AlertTriangle className="w-4 h-4 mr-2 inline" />
+                    Create RFI
+                  </button>
+                  <button 
+                    className="w-full bg-gradient-to-r from-purple-500 to-purple-600 text-white py-3 px-4 rounded-lg font-semibold hover:from-purple-600 hover:to-purple-700 transition-all duration-200 focus:outline-none focus:ring-4 focus:ring-purple-300 shadow-md hover:shadow-lg"
+                    onClick={() => showToastMessage('Budget Assistant', 'Launching rough order of magnitude generator...', 'info')}
+                  >
+                    <BarChart3 className="w-4 h-4 mr-2 inline" />
+                    ROM Estimate
+                  </button>
+                </div>
+              </div>
+
+              {/* Compliance Notice */}
+              <div className="bg-gradient-to-r from-gray-50 to-blue-50 border border-gray-200 rounded-xl p-4 mt-6">
+                <div className="flex items-start gap-3">
+                  <Shield className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div>
+                    <div className="font-semibold text-gray-900 text-sm mb-1">
+                      AI Analysis Disclaimer
+                    </div>
+                    <div className="text-gray-600 text-xs leading-relaxed">
+                      This tool provides AI-powered assistance for construction document analysis. 
+                      All outputs require review by licensed professionals. Not a substitute for 
+                      engineering judgment or code compliance verification.
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Progress Indicator for Processing Files */}
+              {uploadedFiles.some(file => file.status === 'processing') && (
+                <div className="bg-gradient-to-r from-yellow-50 to-orange-50 border border-yellow-200 rounded-xl p-4 mt-6">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-5 h-5 border-2 border-yellow-600 border-t-transparent rounded-full animate-spin"></div>
+                    <div className="font-semibold text-yellow-900">Processing Files...</div>
+                  </div>
+                  <div className="w-full bg-yellow-200 rounded-full h-2 mb-2">
+                    <div className="bg-gradient-to-r from-yellow-500 to-orange-500 h-2 rounded-full transition-all duration-300" style={{width: '65%'}}></div>
+                  </div>
+                  <div className="text-yellow-700 text-xs">
+                    Analyzing document structure and extracting specifications...
+                  </div>
+                </div>
+              )}
+            </div>
+          </aside>
+        </div>
+
+        {/* Footer */}
+        <footer className="mt-8 text-center text-gray-500 text-sm">
+          <div className="flex items-center justify-center gap-4 mb-2">
+            <span>Scoprix Core™ v1.0.3</span>
+            <span>•</span>
+            <span>WCAG 2.1 AA Compliant</span>
+            <span>•</span>
+            <span>SOC 2 Type II Certified</span>
+          </div>
+          <div>
+            Built for construction professionals by construction professionals
+          </div>
+        </footer>
+      </div>
     </div>
   );
-};
-
-export default ScoprixApp;
+}
