@@ -40,63 +40,7 @@ interface UploadedFile {
 }
 
 export default function ScoprixUploadInterface() {
-  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([
-    {
-      id: 1,
-      name: 'HVAC-Floor-2-50%CD.pdf',
-      size: '2.1 MB',
-      type: 'PDF',
-      status: 'analyzed',
-      uploadTime: '1 hour ago',
-      isSelected: true,
-      tag: 'ORIGINAL',
-      analysis: {
-        equipmentCount: 47,
-        specificationsCount: 156,
-        confidence: 96,
-        equipment: [
-          { item: 'VRF Outdoor Unit', qty: 2, location: 'Roof', specs: '10 Ton, NEMA 4X' },
-          { item: 'VRF Indoor Units', qty: 12, location: 'Various Offices', specs: 'Ceiling Cassette' },
-          { item: 'Ductwork - Main', qty: 450, location: 'Above Ceiling', specs: '24" x 12" Galvanized' }
-        ],
-        specifications: [
-          { section: '23 05 00', title: 'Basic HVAC Requirements', items: 45 },
-          { section: '23 36 00', title: 'VRF Systems', items: 67 },
-          { section: '23 31 00', title: 'Ductwork', items: 44 }
-        ]
-      }
-    },
-    {
-      id: 2,
-      name: 'HVAC-Floor-2-100%CD.pdf',
-      size: '2.8 MB',
-      type: 'PDF',
-      status: 'analyzed',
-      uploadTime: '5 minutes ago',
-      isSelected: true,
-      tag: 'REVISED',
-      analysis: {
-        equipmentCount: 52,
-        specificationsCount: 168,
-        confidence: 94,
-        equipment: [
-          { item: 'VRF Outdoor Unit', qty: 3, location: 'Roof', specs: '10 Ton, NEMA 4X' },
-          { item: 'VRF Indoor Units', qty: 15, location: 'Various Offices', specs: 'Ceiling Cassette' },
-          { item: 'Ductwork - Main', qty: 520, location: 'Above Ceiling', specs: '24" x 12" Galvanized' }
-        ],
-        specifications: [
-          { section: '23 05 00', title: 'Basic HVAC Requirements', items: 48 },
-          { section: '23 36 00', title: 'VRF Systems', items: 72 },
-          { section: '23 31 00', title: 'Ductwork', items: 48 }
-        ],
-        changes: [
-          { type: 'added', item: 'VRF Outdoor Unit', from: 2, to: 3, impact: 'high' },
-          { type: 'modified', item: 'VRF Indoor Units', from: 12, to: 15, impact: 'medium' },
-          { type: 'modified', item: 'Ductwork - Main', from: 450, to: 520, impact: 'medium' }
-        ]
-      }
-    }
-  ]);
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
 
   const [isDragOver, setIsDragOver] = useState(false);
   const [showToast, setShowToast] = useState<{title: string, message: string, type: string} | null>(null);
@@ -241,11 +185,11 @@ export default function ScoprixUploadInterface() {
               </div>
               <div className="lg:ml-4">
                 <div className="text-xl font-bold text-gray-800 tracking-tight">
-                  Metro Hospital HVAC Retrofit
+                  {uploadedFiles.length > 0 ? 'Document Analysis Project' : 'New Project Setup'}
                 </div>
                 <div className="text-sm text-gray-600 font-medium flex items-center gap-2">
                   <Shield className="w-4 h-4 text-green-500" />
-                  Project #4521 • SOC 2 Compliant
+                  {uploadedFiles.length > 0 ? `${uploadedFiles.length} files uploaded • SOC 2 Compliant` : 'Ready for document upload • SOC 2 Compliant'}
                 </div>
               </div>
             </div>
@@ -484,85 +428,87 @@ export default function ScoprixUploadInterface() {
                   )}
 
                   {/* File List */}
-                  <div className="mb-8">
-                    <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
-                      <FolderOpen className="w-5 h-5 text-blue-500" />
-                      Uploaded Files
-                    </h3>
-                    <div className="space-y-4">
-                      {uploadedFiles.map((file) => (
-                        <div key={file.id} className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border-2 border-blue-300 p-6 shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:scale-[1.02]">
-                          <div className="flex items-center gap-6">
-                            <input 
-                              type="checkbox" 
-                              checked={file.isSelected}
-                              onChange={() => toggleFileSelection(file.id)}
-                              className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 focus:ring-4"
-                            />
-                            <div className={`w-16 h-16 bg-gradient-to-br ${getFileTypeColor(file.type)} rounded-2xl flex items-center justify-center shadow-lg`}>
-                              {getFileIcon(file.type)}
-                            </div>
-                            <div className="flex-1">
-                              <div className="flex items-center gap-3 mb-2">
-                                <h4 className="font-bold text-gray-900 text-lg">{file.name}</h4>
-                                <span className={`px-3 py-1 text-white text-sm font-bold rounded-lg shadow-md ${
-                                  file.tag === 'ORIGINAL' ? 'bg-gradient-to-r from-purple-500 to-purple-600' :
-                                  file.tag === 'REVISED' ? 'bg-gradient-to-r from-green-500 to-green-600' :
-                                  'bg-gradient-to-r from-blue-500 to-blue-600'
-                                }`}>
-                                  {file.tag}
-                                </span>
-                                {file.analysis && (
-                                  <div className="relative">
-                                    <button 
-                                      className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-500 hover:text-white transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-300"
-                                      onMouseEnter={() => setActiveTooltip(`analysis-${file.id}`)}
-                                      onMouseLeave={() => setActiveTooltip(null)}
-                                    >
-                                      <Info className="w-3 h-3" />
-                                    </button>
-                                    {activeTooltip === `analysis-${file.id}` && (
-                                      <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-72 bg-gray-900/95 backdrop-blur-sm text-white p-4 rounded-xl shadow-2xl z-50 animate-in fade-in duration-200">
-                                        <div className="text-yellow-400 font-bold mb-2 flex items-center gap-2">
-                                          <BarChart3 className="w-4 h-4" />
-                                          File Analysis
-                                        </div>
-                                        <div className="text-sm">
-                                          This document contains {file.analysis.equipmentCount} equipment items and {file.analysis.specificationsCount} specifications. 
-                                          Analysis confidence: {file.analysis.confidence}%. Perfect for comparison analysis!
-                                        </div>
-                                        <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-6 border-transparent border-t-gray-900"></div>
-                                      </div>
-                                    )}
-                                  </div>
-                                )}
+                  {uploadedFiles.length > 0 && (
+                    <div className="mb-8">
+                      <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-3">
+                        <FolderOpen className="w-5 h-5 text-blue-500" />
+                        Uploaded Files
+                      </h3>
+                      <div className="space-y-4">
+                        {uploadedFiles.map((file) => (
+                          <div key={file.id} className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border-2 border-blue-300 p-6 shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1 hover:scale-[1.02]">
+                            <div className="flex items-center gap-6">
+                              <input 
+                                type="checkbox" 
+                                checked={file.isSelected}
+                                onChange={() => toggleFileSelection(file.id)}
+                                className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500 focus:ring-4"
+                              />
+                              <div className={`w-16 h-16 bg-gradient-to-br ${getFileTypeColor(file.type)} rounded-2xl flex items-center justify-center shadow-lg`}>
+                                {getFileIcon(file.type)}
                               </div>
-                              <p className="text-gray-600">{file.size} • Uploaded {file.uploadTime} • {file.status === 'analyzed' ? 'Analysis complete' : 'Processing...'}</p>
-                            </div>
-                            <div className="flex items-center gap-4">
-                              <span className={`px-4 py-2 rounded-xl font-bold border shadow-sm ${getStatusColor(file.status)}`}>
-                                {file.status === 'analyzed' && <CheckCircle className="w-4 h-4 mr-2 inline" />}
-                                {file.status === 'processing' && <div className="w-4 h-4 mr-2 inline-block border-2 border-yellow-600 border-t-transparent rounded-full animate-spin"></div>}
-                                {file.status === 'analyzed' ? 'Analyzed' : 'Processing'}
-                              </span>
-                              <button 
-                                className="w-12 h-12 bg-gray-100 text-gray-500 rounded-xl hover:bg-blue-500 hover:text-white transition-all duration-300 shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300"
-                                onClick={() => showToastMessage('File Preview', `Opening preview for ${file.name}...`, 'info')}
-                              >
-                                <Eye className="w-5 h-5 mx-auto" />
-                              </button>
-                              <button 
-                                className="w-12 h-12 bg-red-100 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all duration-300 shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-red-300"
-                                onClick={() => deleteFile(file.id)}
-                              >
-                                <Trash2 className="w-5 h-5 mx-auto" />
-                              </button>
+                              <div className="flex-1">
+                                <div className="flex items-center gap-3 mb-2">
+                                  <h4 className="font-bold text-gray-900 text-lg">{file.name}</h4>
+                                  <span className={`px-3 py-1 text-white text-sm font-bold rounded-lg shadow-md ${
+                                    file.tag === 'ORIGINAL' ? 'bg-gradient-to-r from-purple-500 to-purple-600' :
+                                    file.tag === 'REVISED' ? 'bg-gradient-to-r from-green-500 to-green-600' :
+                                    'bg-gradient-to-r from-blue-500 to-blue-600'
+                                  }`}>
+                                    {file.tag}
+                                  </span>
+                                  {file.analysis && (
+                                    <div className="relative">
+                                      <button 
+                                        className="w-6 h-6 bg-blue-100 text-blue-600 rounded-full hover:bg-blue-500 hover:text-white transition-all duration-200 flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                        onMouseEnter={() => setActiveTooltip(`analysis-${file.id}`)}
+                                        onMouseLeave={() => setActiveTooltip(null)}
+                                      >
+                                        <Info className="w-3 h-3" />
+                                      </button>
+                                      {activeTooltip === `analysis-${file.id}` && (
+                                        <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 w-72 bg-gray-900/95 backdrop-blur-sm text-white p-4 rounded-xl shadow-2xl z-50 animate-in fade-in duration-200">
+                                          <div className="text-yellow-400 font-bold mb-2 flex items-center gap-2">
+                                            <BarChart3 className="w-4 h-4" />
+                                            File Analysis
+                                          </div>
+                                          <div className="text-sm">
+                                            This document contains {file.analysis.equipmentCount} equipment items and {file.analysis.specificationsCount} specifications. 
+                                            Analysis confidence: {file.analysis.confidence}%. Perfect for comparison analysis!
+                                          </div>
+                                          <div className="absolute top-full left-1/2 transform -translate-x-1/2 border-6 border-transparent border-t-gray-900"></div>
+                                        </div>
+                                      )}
+                                    </div>
+                                  )}
+                                </div>
+                                <p className="text-gray-600">{file.size} • Uploaded {file.uploadTime} • {file.status === 'analyzed' ? 'Analysis complete' : 'Processing...'}</p>
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <span className={`px-4 py-2 rounded-xl font-bold border shadow-sm ${getStatusColor(file.status)}`}>
+                                  {file.status === 'analyzed' && <CheckCircle className="w-4 h-4 mr-2 inline" />}
+                                  {file.status === 'processing' && <div className="w-4 h-4 mr-2 inline-block border-2 border-yellow-600 border-t-transparent rounded-full animate-spin"></div>}
+                                  {file.status === 'analyzed' ? 'Analyzed' : 'Processing'}
+                                </span>
+                                <button 
+                                  className="w-12 h-12 bg-gray-100 text-gray-500 rounded-xl hover:bg-blue-500 hover:text-white transition-all duration-300 shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-blue-300"
+                                  onClick={() => showToastMessage('File Preview', `Opening preview for ${file.name}...`, 'info')}
+                                >
+                                  <Eye className="w-5 h-5 mx-auto" />
+                                </button>
+                                <button 
+                                  className="w-12 h-12 bg-red-100 text-red-500 rounded-xl hover:bg-red-500 hover:text-white transition-all duration-300 shadow-md hover:shadow-lg focus:outline-none focus:ring-4 focus:ring-red-300"
+                                  onClick={() => deleteFile(file.id)}
+                                >
+                                  <Trash2 className="w-5 h-5 mx-auto" />
+                                </button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  )}
 
                   {/* Action Buttons */}
                   {selectedCount > 0 && (
@@ -598,32 +544,51 @@ export default function ScoprixUploadInterface() {
                   </div>
 
                   {/* File Selection for Analysis */}
-                  <div className="mb-8">
-                    <h3 className="text-lg font-bold text-gray-900 mb-4">Select Document to Analyze</h3>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {uploadedFiles.filter(f => f.status === 'analyzed').map((file) => (
-                        <button
-                          key={file.id}
-                          onClick={() => setSelectedFileForAnalysis(file)}
-                          className={`p-4 rounded-xl border-2 transition-all duration-300 text-left ${
-                            selectedFileForAnalysis?.id === file.id
-                              ? 'border-blue-500 bg-blue-50'
-                              : 'border-gray-200 bg-white hover:border-blue-300'
-                          }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className={`w-12 h-12 bg-gradient-to-br ${getFileTypeColor(file.type)} rounded-xl flex items-center justify-center shadow-lg`}>
-                              {getFileIcon(file.type)}
-                            </div>
-                            <div>
-                              <div className="font-bold text-gray-900">{file.name}</div>
-                              <div className="text-sm text-gray-600">{file.analysis?.equipmentCount} equipment items • {file.analysis?.confidence}% confidence</div>
-                            </div>
-                          </div>
-                        </button>
-                      ))}
+                  {uploadedFiles.filter(f => f.status === 'analyzed').length > 0 ? (
+                    <>
+                      <div className="mb-8">
+                        <h3 className="text-lg font-bold text-gray-900 mb-4">Select Document to Analyze</h3>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {uploadedFiles.filter(f => f.status === 'analyzed').map((file) => (
+                            <button
+                              key={file.id}
+                              onClick={() => setSelectedFileForAnalysis(file)}
+                              className={`p-4 rounded-xl border-2 transition-all duration-300 text-left ${
+                                selectedFileForAnalysis?.id === file.id
+                                  ? 'border-blue-500 bg-blue-50'
+                                  : 'border-gray-200 bg-white hover:border-blue-300'
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className={`w-12 h-12 bg-gradient-to-br ${getFileTypeColor(file.type)} rounded-xl flex items-center justify-center shadow-lg`}>
+                                  {getFileIcon(file.type)}
+                                </div>
+                                <div>
+                                  <div className="font-bold text-gray-900">{file.name}</div>
+                                  <div className="text-sm text-gray-600">{file.analysis?.equipmentCount} equipment items • {file.analysis?.confidence}% confidence</div>
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="text-center py-12">
+                      <BarChart3 className="w-16 h-16 mx-auto text-gray-400 mb-4" />
+                      <h3 className="text-xl font-bold text-gray-900 mb-2">No Analysis Available</h3>
+                      <p className="text-gray-600 mb-6">
+                        Upload and analyze documents first to view detailed results
+                      </p>
+                      <button 
+                        className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-3 rounded-xl font-semibold shadow-lg hover:shadow-xl transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-blue-300"
+                        onClick={() => setActiveTab('upload')}
+                      >
+                        <CloudUpload className="w-4 h-4 mr-2 inline" />
+                        Upload Documents
+                      </button>
                     </div>
-                  </div>
+                  )}
 
                   {/* Analysis Results Display */}
                   {selectedFileForAnalysis && selectedFileForAnalysis.analysis && (
@@ -846,20 +811,20 @@ export default function ScoprixUploadInterface() {
             <div className="space-y-6">
               <div className="bg-gradient-to-r from-green-50 to-emerald-50 rounded-xl p-4 border border-green-200">
                 <div className="text-green-800 font-bold mb-2">Ready for Analysis</div>
-                <div className="text-2xl font-bold text-green-900">{selectedCount} Files</div>
-                <div className="text-sm text-green-700 mt-1">Optimal comparison set detected</div>
+                <div className="text-2xl font-bold text-green-900">{selectedCount > 0 ? selectedCount : '--'} Files</div>
+                <div className="text-sm text-green-700 mt-1">{selectedCount > 0 ? 'Optimal comparison set detected' : 'Upload files to begin analysis'}</div>
               </div>
               
               <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-4 border border-blue-200">
                 <div className="text-blue-800 font-bold mb-2">Processing Speed</div>
-                <div className="text-2xl font-bold text-blue-900">2.4 min</div>
-                <div className="text-sm text-blue-700 mt-1">Average analysis time</div>
+                <div className="text-2xl font-bold text-blue-900">{uploadedFiles.some(f => f.status === 'analyzed') ? '2.4 min' : '--'}</div>
+                <div className="text-sm text-blue-700 mt-1">{uploadedFiles.some(f => f.status === 'analyzed') ? 'Average analysis time' : 'TBD after first analysis'}</div>
               </div>
               
               <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-xl p-4 border border-purple-200">
                 <div className="text-purple-800 font-bold mb-2">Accuracy Rate</div>
-                <div className="text-2xl font-bold text-purple-900">96.7%</div>
-                <div className="text-sm text-purple-700 mt-1">Change detection precision</div>
+                <div className="text-2xl font-bold text-purple-900">{uploadedFiles.some(f => f.status === 'analyzed') ? '96.7%' : '--'}</div>
+                <div className="text-sm text-purple-700 mt-1">{uploadedFiles.some(f => f.status === 'analyzed') ? 'Change detection precision' : 'TBD after first analysis'}</div>
               </div>
 
               {/* Recent Analysis Results */}
@@ -869,18 +834,27 @@ export default function ScoprixUploadInterface() {
                   Recent Results
                 </h4>
                 <div className="space-y-3">
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                    <div className="font-semibold text-yellow-900 text-sm">⚠️ 7 Changes Detected</div>
-                    <div className="text-yellow-700 text-xs mt-1">HVAC equipment specifications modified</div>
-                  </div>
-                  <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-                    <div className="font-semibold text-green-900 text-sm">✅ COR-2024-003 Generated</div>
-                    <div className="text-green-700 text-xs mt-1">$47,250 additional scope identified</div>
-                  </div>
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                    <div className="font-semibold text-blue-900 text-sm">📋 RFI-2024-012 Triggered</div>
-                    <div className="text-blue-700 text-xs mt-1">NEMA 4X clarification required</div>
-                  </div>
+                  {uploadedFiles.some(f => f.status === 'analyzed') ? (
+                    <>
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                        <div className="font-semibold text-yellow-900 text-sm">⚠️ 7 Changes Detected</div>
+                        <div className="text-yellow-700 text-xs mt-1">HVAC equipment specifications modified</div>
+                      </div>
+                      <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+                        <div className="font-semibold text-green-900 text-sm">✅ COR-2024-003 Generated</div>
+                        <div className="text-green-700 text-xs mt-1">$47,250 additional scope identified</div>
+                      </div>
+                      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                        <div className="font-semibold text-blue-900 text-sm">📋 RFI-2024-012 Triggered</div>
+                        <div className="text-blue-700 text-xs mt-1">NEMA 4X clarification required</div>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 text-center">
+                      <div className="text-gray-500 text-sm">No analysis results yet</div>
+                      <div className="text-gray-400 text-xs mt-1">Upload documents to see analysis results</div>
+                    </div>
+                  )}
                 </div>
               </div>
 
