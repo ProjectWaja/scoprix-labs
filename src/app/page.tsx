@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useCallback } from 'react';
-import { Upload, FileText, Settings, Shield, Zap, Check, X, Info, AlertTriangle, Building, CloudUpload, FolderOpen, CheckCircle, Trash2, Eye, Download, BarChart3, Search, DollarSign, AlertCircle, Clock, Target, Calculator, Edit3, Save, TrendingUp, Wrench, Users, ArrowLeft, Menu } from 'lucide-react';
+import { Upload, FileText, Shield, Info, AlertTriangle, Building, CloudUpload, CheckCircle, Download, BarChart3, Search, DollarSign, AlertCircle, Clock, Target, Calculator, ArrowLeft, X } from 'lucide-react';
 
 const ScoprixApp = () => {
   const [currentView, setCurrentView] = useState('landing');
@@ -29,32 +29,15 @@ const ScoprixApp = () => {
   ]);
 
   const [isDragOver, setIsDragOver] = useState(false);
-  const [showToast, setShowToast] = useState(null);
-  const fileInputRef = useRef(null);
+  const [showToast, setShowToast] = useState<{title: string, message: string, type: string} | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const showToastMessage = (title, message, type = 'info') => {
+  const showToastMessage = (title: string, message: string, type = 'info') => {
     setShowToast({ title, message, type });
     setTimeout(() => setShowToast(null), 4000);
   };
 
-  const handleDragOver = useCallback((e) => {
-    e.preventDefault();
-    setIsDragOver(true);
-  }, []);
-
-  const handleDragLeave = useCallback((e) => {
-    e.preventDefault();
-    setIsDragOver(false);
-  }, []);
-
-  const handleDrop = useCallback((e) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    const files = Array.from(e.dataTransfer.files);
-    handleFileUpload(files);
-  }, []);
-
-  const handleFileUpload = (files) => {
+  const handleFileUpload = useCallback((files: File[]) => {
     if (files.length === 0) return;
     
     showToastMessage('Upload Started', `Processing ${files.length} file(s)...`, 'info');
@@ -74,9 +57,26 @@ const ScoprixApp = () => {
       setUploadedFiles(prev => [...prev, ...newFiles]);
       showToastMessage('Upload Complete', 'Files uploaded successfully and queued for analysis', 'success');
     }, 2000);
-  };
+  }, [uploadedFiles.length]);
 
-  const toggleFileSelection = (fileId) => {
+  const handleDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(true);
+  }, []);
+
+  const handleDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+  }, []);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const files = Array.from(e.dataTransfer.files);
+    handleFileUpload(files);
+  }, [handleFileUpload]);
+
+  const toggleFileSelection = (fileId: number) => {
     setUploadedFiles(prev => 
       prev.map(file => 
         file.id === fileId ? { ...file, isSelected: !file.isSelected } : file
@@ -490,7 +490,7 @@ const ScoprixApp = () => {
                         <div className="text-sm font-medium text-gray-900">Vibration Isolators</div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">Spring Type, 1" Deflection</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">Spring Type, 1 inch Deflection</td>
                     <td className="px-6 py-4 text-sm text-gray-900">Not Specified</td>
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">
@@ -512,8 +512,8 @@ const ScoprixApp = () => {
                         <div className="text-sm font-medium text-gray-900">Control Valves - Chilled Water</div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-900">3" Ball Valve with Actuator</td>
-                    <td className="px-6 py-4 text-sm text-gray-900">2.5" Ball Valve with Actuator</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">3 inch Ball Valve with Actuator</td>
+                    <td className="px-6 py-4 text-sm text-gray-900">2.5 inch Ball Valve with Actuator</td>
                     <td className="px-6 py-4">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">
                         <X className="w-3 h-3 mr-1" />
