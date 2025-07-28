@@ -1,10 +1,46 @@
 'use client'
 
 import React, { useState, useRef, useCallback } from 'react';
-import { Upload, FileText, Settings, Shield, Zap, Check, X, Info, AlertTriangle, Building, CloudUpload, FolderOpen, CheckCircle, Trash2, Eye, Download, BarChart3, Target, Wrench } from 'lucide-react';
+import { FileText, Settings, Shield, Zap, Check, X, Info, AlertTriangle, Building, CloudUpload, FolderOpen, CheckCircle, Trash2, Eye, Download, BarChart3, Target, Wrench } from 'lucide-react';
+
+interface FileAnalysis {
+  equipmentCount: number;
+  specificationsCount: number;
+  confidence: number;
+  equipment: Array<{
+    item: string;
+    qty: number;
+    location: string;
+    specs: string;
+  }>;
+  specifications: Array<{
+    section: string;
+    title: string;
+    items: number;
+  }>;
+  changes?: Array<{
+    type: string;
+    item: string;
+    from: number;
+    to: number;
+    impact: string;
+  }>;
+}
+
+interface UploadedFile {
+  id: number;
+  name: string;
+  size: string;
+  type: string;
+  status: string;
+  uploadTime: string;
+  isSelected: boolean;
+  tag: string;
+  analysis: FileAnalysis | null;
+}
 
 export default function ScoprixUploadInterface() {
-  const [uploadedFiles, setUploadedFiles] = useState([
+  const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([
     {
       id: 1,
       name: 'HVAC-Floor-2-50%CD.pdf',
@@ -63,11 +99,10 @@ export default function ScoprixUploadInterface() {
   ]);
 
   const [isDragOver, setIsDragOver] = useState(false);
-  const [isUploading, setIsUploading] = useState(false);
   const [showToast, setShowToast] = useState<{title: string, message: string, type: string} | null>(null);
   const [activeTooltip, setActiveTooltip] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState('upload');
-  const [selectedFileForAnalysis, setSelectedFileForAnalysis] = useState<any>(null);
+  const [selectedFileForAnalysis, setSelectedFileForAnalysis] = useState<UploadedFile | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const showToastMessage = (title: string, message: string, type: string = 'info') => {
@@ -85,22 +120,14 @@ export default function ScoprixUploadInterface() {
     setIsDragOver(false);
   }, []);
 
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-    const files = Array.from(e.dataTransfer.files);
-    handleFileUpload(files);
-  }, []);
-
-  const handleFileUpload = (files: File[]) => {
+  const handleFileUpload = useCallback((files: File[]) => {
     if (files.length === 0) return;
     
-    setIsUploading(true);
     showToastMessage('Upload Started', `Processing ${files.length} file(s)...`, 'info');
     
     // Simulate upload with progress
     setTimeout(() => {
-      const newFiles = files.map((file, index) => ({
+      const newFiles: UploadedFile[] = files.map((file, index) => ({
         id: uploadedFiles.length + index + 1,
         name: file.name,
         size: `${(file.size / (1024 * 1024)).toFixed(1)} MB`,
@@ -113,10 +140,16 @@ export default function ScoprixUploadInterface() {
       }));
       
       setUploadedFiles(prev => [...prev, ...newFiles]);
-      setIsUploading(false);
       showToastMessage('Upload Complete', 'Files uploaded successfully and queued for analysis', 'success');
     }, 2000);
-  };
+  }, [uploadedFiles.length]);
+
+  const handleDrop = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragOver(false);
+    const files = Array.from(e.dataTransfer.files);
+    handleFileUpload(files);
+  }, [handleFileUpload]);
 
   const toggleFileSelection = (fileId: number) => {
     setUploadedFiles(prev => 
@@ -625,7 +658,7 @@ export default function ScoprixUploadInterface() {
                               </tr>
                             </thead>
                             <tbody className="bg-white divide-y divide-gray-200">
-                              {selectedFileForAnalysis.analysis.equipment.map((item: any, index: number) => (
+                              {selectedFileForAnalysis.analysis.equipment.map((item, index) => (
                                 <tr key={index} className="hover:bg-gray-50">
                                   <td className="px-6 py-4 whitespace-nowrap">
                                     <div className="text-sm font-medium text-gray-900">{item.item}</div>
@@ -659,7 +692,7 @@ export default function ScoprixUploadInterface() {
                         </div>
                         <div className="p-6">
                           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {selectedFileForAnalysis.analysis.specifications.map((spec: any, index: number) => (
+                            {selectedFileForAnalysis.analysis.specifications.map((spec, index) => (
                               <div key={index} className="bg-gray-50 rounded-lg p-4 border border-gray-200">
                                 <div className="font-bold text-gray-900">{spec.section}</div>
                                 <div className="text-sm text-gray-600 mt-1">{spec.title}</div>
@@ -681,7 +714,7 @@ export default function ScoprixUploadInterface() {
                           </div>
                           <div className="p-6">
                             <div className="space-y-4">
-                              {selectedFileForAnalysis.analysis.changes.map((change: any, index: number) => (
+                              {selectedFileForAnalysis.analysis.changes.map((change, index) => (
                                 <div key={index} className={`p-4 rounded-lg border-l-4 ${
                                   change.type === 'added' ? 'bg-green-50 border-green-500' :
                                   change.type === 'modified' ? 'bg-yellow-50 border-yellow-500' :
